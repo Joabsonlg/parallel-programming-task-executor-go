@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -72,7 +73,7 @@ func write(task Task, sharedFile *os.File, rwMutex *sync.RWMutex) {
 	defer rwMutex.Unlock() // Desbloqueia após a conclusão da função
 
 	_, err := sharedFile.Seek(0, 0) // Posiciona o ponteiro do arquivo no início
-	if err != nil {
+	if err != nil && err != io.EOF {
 		log.Println(err)
 		return
 	}
@@ -93,7 +94,7 @@ func write(task Task, sharedFile *os.File, rwMutex *sync.RWMutex) {
 		return
 	}
 
-	//fmt.Printf("W - Task %d : %d\n", task.ID, newValue)
+	fmt.Printf("W - Task %d : %d\n", task.ID, newValue)
 }
 
 // Função read para processar tarefas de leitura
@@ -192,10 +193,8 @@ func main() {
 
 		// Registrar o fim do processamento
 		endTime := time.Now()
-
-		// Calcular e exibir o tempo total
 		totalTime := endTime.Sub(startTime)
-		fmt.Printf("Tempo total de processamento: %s\n", totalTime)
+		fmt.Printf("Tempo total de processamento (nanossegundos): %d\n", totalTime.Nanoseconds())
 	}()
 
 	// Coletar resultados

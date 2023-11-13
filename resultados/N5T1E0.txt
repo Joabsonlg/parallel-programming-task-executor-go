@@ -1,0 +1,2 @@
+Tempo total de processamento (nanossegundos): 472978342880
+Resultado do arquivo shared_file: 0
