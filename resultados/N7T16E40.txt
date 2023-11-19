@@ -1,1 +1,1 @@
-Tempo total de processamento (nanossegundos):
+Tempo total de processamento (nanossegundos): 947920157847
