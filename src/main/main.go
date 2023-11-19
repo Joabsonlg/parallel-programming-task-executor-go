@@ -53,7 +53,7 @@ func worker(workerID int, tasks chan Task, sharedFile *os.File, results chan Res
 	defer wg.Done() // Sinaliza a conclusão da goroutine ao WaitGroup ao retornar
 	for task := range tasks {
 		startTime := time.Now()
-		//fmt.Printf("Worker %d está processando a tarefa %d\n", workerID, task.ID)
+		fmt.Printf("Worker %d está processando a tarefa %d\n", workerID, task.ID)
 		if task.TaskType == WRITING {
 			write(task, sharedFile, rwMutex)
 		} else {
@@ -94,7 +94,7 @@ func write(task Task, sharedFile *os.File, rwMutex *sync.RWMutex) {
 		return
 	}
 
-	fmt.Printf("W - Task %d : %d\n", task.ID, newValue)
+	//fmt.Printf("W - Task %d : %d\n", task.ID, newValue)
 }
 
 // Função read para processar tarefas de leitura
@@ -117,7 +117,7 @@ func read(task Task, sharedFile *os.File, rwMutex *sync.RWMutex) {
 		return
 	}
 
-	fmt.Printf("R - Task %d : %s\n", task.ID, value)
+	//fmt.Printf("R - Task %d : %s\n", task.ID, value)
 }
 
 // Função main: ponto de entrada do programa
@@ -153,9 +153,9 @@ func main() {
 	}
 
 	// Embaralhar as tarefas
-	rand.Shuffle(len(tasks), func(i, j int) {
-		tasks[i], tasks[j] = tasks[j], tasks[i]
-	})
+	//rand.Shuffle(len(tasks), func(i, j int) {
+	//	tasks[i], tasks[j] = tasks[j], tasks[i]
+	//})
 
 	// Enfileirar as tarefas embaralhadas
 	for _, task := range tasks {
