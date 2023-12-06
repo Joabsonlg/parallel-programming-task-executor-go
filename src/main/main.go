@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -11,116 +10,6 @@ import (
 	"time"
 )
 
-// TaskType Declaração de um tipo personalizado para diferenciar tarefas de leitura e escrita
-type TaskType int
-
-const (
-	READING TaskType = iota
-	WRITING
-)
-
-// Task Estrutura para armazenar detalhes de uma tarefa
-type Task struct {
-	ID       int
-	Custo    float64
-	TaskType TaskType
-	Value    int
-}
-
-// Result Estrutura para armazenar o resultado de uma tarefa processada
-type Result struct {
-	ID     int
-	Result string
-	Time   int64
-}
-
-// Executor Estrutura para gerenciar filas de tarefas e resultados
-type Executor struct {
-	TaskQueue chan Task
-	Results   chan Result
-}
-
-// NewExecutor Função para criar um novo Executor com tamanhos de fila especificados
-func NewExecutor(taskQueueSize, resultQueueSize int) *Executor {
-	return &Executor{
-		TaskQueue: make(chan Task, taskQueueSize),
-		Results:   make(chan Result, resultQueueSize),
-	}
-}
-
-// Função worker para processar tarefas. Cada worker executa em uma goroutine separada.
-func worker(workerID int, tasks chan Task, sharedFile *os.File, results chan Result, rwMutex *sync.RWMutex, wg *sync.WaitGroup) {
-	defer wg.Done() // Sinaliza a conclusão da goroutine ao WaitGroup ao retornar
-	for task := range tasks {
-		startTime := time.Now()
-		fmt.Printf("Worker %d está processando a tarefa %d\n", workerID, task.ID)
-		if task.TaskType == WRITING {
-			write(task, sharedFile, rwMutex)
-		} else {
-			read(task, sharedFile, rwMutex)
-		}
-		endTime := time.Now()
-		executionTime := endTime.Sub(startTime).Nanoseconds()
-		results <- Result{ID: task.ID, Time: executionTime} // Envia o resultado para o canal Results
-	}
-}
-
-// Função write para processar tarefas de escrita
-func write(task Task, sharedFile *os.File, rwMutex *sync.RWMutex) {
-	time.Sleep(time.Duration(task.Custo*1000) * time.Millisecond)
-
-	rwMutex.Lock()         // Bloqueia para escrita
-	defer rwMutex.Unlock() // Desbloqueia após a conclusão da função
-
-	_, err := sharedFile.Seek(0, 0) // Posiciona o ponteiro do arquivo no início
-	if err != nil && err != io.EOF {
-		log.Println(err)
-		return
-	}
-
-	var existingValue int
-	_, err = fmt.Fscanln(sharedFile, &existingValue) // Lê o valor existente no arquivo
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	newValue := existingValue + task.Value
-	sharedFile.Truncate(0)                                         // Limpa o conteúdo do arquivo
-	sharedFile.Seek(0, 0)                                          // Reposiciona o ponteiro no início
-	_, err = sharedFile.WriteString(fmt.Sprintf("%d\n", newValue)) // Escreve o novo valor
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	//fmt.Printf("W - Task %d : %d\n", task.ID, newValue)
-}
-
-// Função read para processar tarefas de leitura
-func read(task Task, sharedFile *os.File, rwMutex *sync.RWMutex) {
-	time.Sleep(time.Duration(task.Custo*1000) * time.Millisecond)
-
-	rwMutex.RLock()         // Bloqueia para leitura
-	defer rwMutex.RUnlock() // Desbloqueia após a conclusão da função
-
-	_, err := sharedFile.Seek(0, 0) // Posiciona o ponteiro do arquivo no início
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	var value string
-	_, err = fmt.Fscanln(sharedFile, &value) // Lê o valor do arquivo
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	//fmt.Printf("R - Task %d : %s\n", task.ID, value)
-}
-
-// Função main: ponto de entrada do programa
 func main() {
 	var nTasksAmount, tWorkersThreads, eWritingTasks int
 	fmt.Print("Digite o valor de N: ")
@@ -134,32 +23,37 @@ func main() {
 
 	tasksAmount := int(math.Pow(10, float64(nTasksAmount)))
 	writingTasks := int(float64(eWritingTasks) / 100 * float64(tasksAmount))
-	readingTasks := tasksAmount - writingTasks
 
-	executor := NewExecutor(tasksAmount, tasksAmount)
-
-	// Gerar tarefas de forma misturada
-	taskId := 0
-	tasks := make([]Task, 0, tasksAmount) // Cria um slice de tarefas vazio com tamanho inicial 0 e capacidade tasksAmount
-
-	for i := 0; i < writingTasks; i++ { // Adiciona tarefas de escrita
-		tasks = append(tasks, Task{ID: taskId, Custo: rand.Float64() * 0.01, TaskType: WRITING, Value: rand.Intn(11)})
-		taskId++
+	// Inicializando TaskDataStore
+	taskDataStore := &TaskDataStore{
+		ids:       make([]int32, tasksAmount),
+		custos:    make([]int16, tasksAmount),
+		taskTypes: make([]bool, tasksAmount),
+		values:    make([]byte, tasksAmount),
 	}
 
-	for i := 0; i < readingTasks; i++ { // Adiciona tarefas de leitura
-		tasks = append(tasks, Task{ID: taskId, Custo: rand.Float64() * 0.01, TaskType: READING, Value: rand.Intn(11)})
-		taskId++
+	// Gerar tarefas
+	for i := 0; i < tasksAmount; i++ {
+		taskDataStore.ids[i] = int32(i)
+		taskDataStore.SetCusto(i, rand.Float32()*0.01)
+		taskDataStore.taskTypes[i] = determineTaskType(i, writingTasks)
+		taskDataStore.values[i] = byte(rand.Intn(11)) // ajuste conforme necessário
 	}
 
 	// Embaralhar as tarefas
-	//rand.Shuffle(len(tasks), func(i, j int) {
-	//	tasks[i], tasks[j] = tasks[j], tasks[i]
+	//rand.Shuffle(len(taskDataStore.ids), func(i, j int) {
+	//	taskDataStore.ids[i], taskDataStore.ids[j] = taskDataStore.ids[j], taskDataStore.ids[i]
+	//	taskDataStore.custos[i], taskDataStore.custos[j] = taskDataStore.custos[j], taskDataStore.custos[i]
+	//	taskDataStore.taskTypes[i], taskDataStore.taskTypes[j] = taskDataStore.taskTypes[j], taskDataStore.taskTypes[i]
+	//	taskDataStore.values[i], taskDataStore.values[j] = taskDataStore.values[j], taskDataStore.values[i]
 	//})
 
-	// Enfileirar as tarefas embaralhadas
-	for _, task := range tasks {
-		executor.TaskQueue <- task
+	// Inicializar Executor
+	executor := NewExecutor(tasksAmount, tasksAmount, taskDataStore)
+
+	// Enfileirar os índices das tarefas embaralhadas
+	for i := 0; i < tasksAmount; i++ {
+		executor.TaskQueue <- int32(i)
 	}
 	close(executor.TaskQueue) // Fechando TaskQueue após inserção de todas as tarefas
 
@@ -177,6 +71,8 @@ func main() {
 	}
 	sharedFile.Sync()
 
+	// Iniciar processamento
+	fmt.Println("Iniciando processamento...")
 	startTime := time.Now()
 
 	var wg sync.WaitGroup
@@ -184,7 +80,7 @@ func main() {
 
 	for i := 0; i < tWorkersThreads; i++ {
 		wg.Add(1)
-		go worker(i, executor.TaskQueue, sharedFile, executor.Results, rwMutex, &wg)
+		go worker(i, executor, sharedFile, rwMutex, &wg)
 	}
 
 	go func() {
@@ -197,9 +93,9 @@ func main() {
 		fmt.Printf("Tempo total de processamento (nanossegundos): %d\n", totalTime.Nanoseconds())
 	}()
 
-	// Coletar resultados
 	for range executor.Results {
-		// Sem print aqui, já que os detalhes são impressos nas funções read e write
+		//fmt.Println("Tarefa processada:", <-executor.Results)
+		// processar resultados
 	}
 
 	fmt.Println("Fim da execução.")
