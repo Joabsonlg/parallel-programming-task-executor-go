@@ -19,7 +19,7 @@ func worker(workerID int, executor *Executor, sharedFile *os.File, rwMutex *sync
 		taskValue := ""
 
 		if executor.TaskData.taskTypes[taskIndex] {
-			//write(taskIndex, executor.TaskData, sharedFile, rwMutex)
+			write(taskIndex, executor.TaskData, sharedFile, rwMutex)
 		} else {
 			s, err := read(taskIndex, executor.TaskData, sharedFile, rwMutex)
 			if err != nil {

@@ -21,8 +21,17 @@ func main() {
 	fmt.Print("Digite o valor de E: ")
 	fmt.Scan(&eWritingTasks)
 
+	//nValues := []int{9}
+	//tValues := []int{1, 16, 256}
+	//eValues := []int{0, 40}
+	//
+	//for _, nTasksAmount := range nValues {
+	//	for _, tWorkersThreads := range tValues {
+	//		for _, eWritingTasks := range eValues {
 	tasksAmount := int(math.Pow(10, float64(nTasksAmount)))
 	writingTasks := int(float64(eWritingTasks) / 100 * float64(tasksAmount))
+
+	fmt.Printf("N: %d, T: %d, E: %d\n", nTasksAmount, tWorkersThreads, eWritingTasks)
 
 	// Inicializando TaskDataStore
 	taskDataStore := &TaskDataStore{
@@ -91,12 +100,35 @@ func main() {
 		endTime := time.Now()
 		totalTime := endTime.Sub(startTime)
 		fmt.Printf("Tempo total de processamento (nanossegundos): %d\n", totalTime.Nanoseconds())
+
+		// Create and open the file
+		fileName := fmt.Sprintf("N%dT%dE%d.txt", nTasksAmount, tWorkersThreads, eWritingTasks)
+		fmt.Println("Criando arquivo:", fileName)
+		resultFile, err := os.Create(fileName)
+		if err != nil {
+			log.Fatalf("Failed to create file: %v", err)
+		}
+		defer resultFile.Close()
+
+		// Write the processing time into the file
+		_, err = resultFile.WriteString(fmt.Sprintf("Total processing time (nanoseconds): %d\n", totalTime.Nanoseconds()))
+		if err != nil {
+			log.Fatalf("Failed to write to file: %v", err)
+		}
+
+		// Check if the write was successful
+		err = resultFile.Sync()
+		if err != nil {
+			log.Fatalf("Failed to sync file: %v", err)
+		}
 	}()
 
 	for range executor.Results {
 		//fmt.Println("Tarefa processada:", <-executor.Results)
-		// processar resultados
 	}
 
-	fmt.Println("Fim da execução.")
+	fmt.Println("Fim da execução.\n")
+	//		}
+	//	}
+	//}
 }
